@@ -3,7 +3,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, User
 from config import Config
-
+from models import db, User, FarmDiary
 app = Flask(__name__)
 app.config.from_object(Config)
 
@@ -175,13 +175,38 @@ def crops():
     )
 
 # -------------------- FARM DIARY --------------------
-@app.route("/diary")
+@app.route("/diary", methods=["GET", "POST"])
 def diary():
 
     if "user" not in session:
         return redirect(url_for("login"))
 
-    return render_template("diary.html")
+    if request.method == "POST":
+
+        activity = request.form["activity"]
+        expense = request.form["expense"]
+        date = request.form["date"]
+
+        record = FarmDiary(
+            farmer=session["user"],
+            activity=activity,
+            expense=expense,
+            date=date
+        )
+
+        db.session.add(record)
+        db.session.commit()
+
+        flash("Diary Entry Saved Successfully!")
+
+    records = FarmDiary.query.filter_by(
+        farmer=session["user"]
+    ).all()
+
+    return render_template(
+        "diary.html",
+        records=records
+    )
 
 
 # -------------------- GOVERNMENT SCHEMES --------------------
@@ -191,28 +216,156 @@ def schemes():
     if "user" not in session:
         return redirect(url_for("login"))
 
-    return render_template("schemes.html")
+    schemes = [
 
+        {
+            "name": "PM-KISAN",
+            "benefit": "₹6000 per year financial assistance",
+            "eligibility": "Small and marginal farmers"
+        },
+
+        {
+            "name": "PM Fasal Bima Yojana",
+            "benefit": "Crop insurance against natural calamities",
+            "eligibility": "All registered farmers"
+        },
+
+        {
+            "name": "Kisan Credit Card (KCC)",
+            "benefit": "Low-interest agricultural loans",
+            "eligibility": "Farmers with cultivable land"
+        },
+
+        {
+            "name": "Soil Health Card",
+            "benefit": "Free soil testing and fertilizer recommendations",
+            "eligibility": "All farmers"
+        },
+
+        {
+            "name": "National Agriculture Market (e-NAM)",
+            "benefit": "Online agricultural market access",
+            "eligibility": "Farmers and traders"
+        }
+
+    ]
+
+    return render_template(
+        "schemes.html",
+        schemes=schemes
+    )
 
 # -------------------- FARMING TIPS --------------------
-@app.route("/tips")
+@app.route("/tips", methods=["GET", "POST"])
 def tips():
 
     if "user" not in session:
         return redirect(url_for("login"))
 
-    return render_template("tips.html")
+    tips = None
+
+    if request.method == "POST":
+
+        season = request.form["season"]
+
+        farming_tips = {
+
+            "Kharif":[
+                "🌧 Prepare proper drainage before heavy rainfall.",
+                "🌱 Use certified quality seeds.",
+                "💧 Avoid waterlogging in the field.",
+                "🪲 Regularly inspect crops for pests.",
+                "🌿 Apply organic compost before sowing."
+            ],
+
+            "Rabi":[
+                "💧 Irrigate crops regularly.",
+                "🌾 Sow wheat and gram on time.",
+                "🧪 Test soil before applying fertilizers.",
+                "🌿 Remove weeds regularly.",
+                "☀ Protect crops from frost."
+            ],
+
+            "Summer":[
+                "💧 Irrigate during morning or evening.",
+                "🌱 Use drip irrigation to save water.",
+                "🌾 Mulch the soil to reduce evaporation.",
+                "🌳 Provide shade for young plants.",
+                "🔥 Avoid excessive fertilizer application."
+            ]
+
+        }
+
+        tips = farming_tips.get(season)
+
+    return render_template(
+        "tips.html",
+        tips=tips
+    )
 
 
 # -------------------- FERTILIZER CALCULATOR --------------------
-@app.route("/fertilizer")
+@app.route("/fertilizer", methods=["GET", "POST"])
 def fertilizer():
 
     if "user" not in session:
         return redirect(url_for("login"))
 
-    return render_template("fertilizer.html")
+    result = None
 
+    if request.method == "POST":
+
+        crop = request.form["crop"]
+        area = float(request.form["area"])
+
+        fertilizer_data = {
+
+            "Rice": {
+                "Urea": 50,
+                "DAP": 25,
+                "Potash": 10
+            },
+
+            "Wheat": {
+                "Urea": 45,
+                "DAP": 20,
+                "Potash": 15
+            },
+
+            "Cotton": {
+                "Urea": 40,
+                "DAP": 30,
+                "Potash": 20
+            },
+
+            "Sugarcane": {
+                "Urea": 80,
+                "DAP": 40,
+                "Potash": 30
+            },
+
+            "Maize": {
+                "Urea": 60,
+                "DAP": 30,
+                "Potash": 15
+            }
+
+        }
+
+        fert = fertilizer_data[crop]
+
+        result = {
+            "crop": crop,
+            "area": area,
+            "urea": fert["Urea"] * area,
+            "dap": fert["DAP"] * area,
+            "potash": fert["Potash"] * area
+        }
+
+    return render_template(
+        "fertilizer.html",
+        result=result
+    )
 
 # -------------------- LOGOUT --------------------
 @app.route("/logout")
